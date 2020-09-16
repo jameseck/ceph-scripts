@@ -7,6 +7,7 @@ import commands
 import time
 import argparse
 import rados
+from datetime import datetime
 
 parser = argparse.ArgumentParser(description='Discover ceph OSDs which have not yet been prepared and prepare them.')
 parser.add_argument('--max-scrubs', dest='MAX_SCRUBS', type=int, default=0,
@@ -15,11 +16,14 @@ parser.add_argument('--sleep', dest='SLEEP', type=int, default=0,
                     help='Sleep this many seconds then run again, looping forever. 0 disables looping. (default: %(default)s)')
 parser.add_argument('--conf', dest='CONF', type=str, default="/etc/ceph/ceph.conf",
                     help='Ceph config file. (default: %(default)s)')
+parser.add_argument('--print-only', dest='PRINT_ONLY', action='store_true', default=False,
+                    help='Whether to actually run the deep scrubs or just print what would happen. (default: %(default)s)')
 
 args = parser.parse_args()
 MAX_SCRUBS = args.MAX_SCRUBS
 SLEEP = args.SLEEP
 CONF = args.CONF
+PRINT_ONLY = args.PRINT_ONLY
 
 # Connect to cluster
 try:
@@ -114,8 +118,11 @@ while(True):
         print '(blocked by OSD', osd, ')',
         blocked = True
     if not blocked and n_to_trigger > 0:
-      output = commands.getoutput('ceph pg deep-scrub %s' % pg['pgid'])
-      print output,
+      if PRINT_ONLY:
+        print 'would run: ceph pg deep-scrub %s' % pg['pgid']
+      else:
+        output = commands.getoutput('ceph pg deep-scrub %s' % pg['pgid'])
+        print output,
       n_triggered += 1
       if n_triggered == n_to_trigger:
         break
@@ -125,7 +132,8 @@ while(True):
 
   if SLEEP:
     print
-    print "Sleeping %d seconds..." % SLEEP
+    print
+    print "%s: Sleeping %d seconds..." % (datetime.now(), SLEEP)
     time.sleep(SLEEP)
     print
   else:
